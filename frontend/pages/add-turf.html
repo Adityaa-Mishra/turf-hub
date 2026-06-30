@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Add Turf — TurfHub</title>
+<link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<nav class="nav" id="navbar"></nav>
+<div class="dash-layout">
+  <aside class="sidebar">
+    <ul class="sb-nav">
+      <li><a href="owner-dashboard.html"><span class="ic">▦</span> Dashboard</a></li>
+      <li><a href="my-turfs.html"><span class="ic">⬚</span> My Turfs</a></li>
+      <li><a href="add-turf.html" class="on"><span class="ic">+</span> Add Turf</a></li>
+      <li><a href="booking-requests.html"><span class="ic">▤</span> Booking Requests</a></li>
+    </ul>
+  </aside>
+
+  <main class="dash-content">
+    <div class="mb-6">
+      <h1 class="dash-title" id="pageTitle">Add new turf</h1>
+      <p class="dash-sub">Fill in the details about your sports venue</p>
+    </div>
+
+    <form id="turfForm" onsubmit="handleSubmit(event)">
+      <div class="add-turf-grid">
+        <div class="add-turf-main">
+          <div class="card"><div class="card-body">
+            <h4 class="mb-4">Basic information</h4>
+            <div class="form-stack">
+              <div class="form-row"><label>Turf name *</label><input type="text" id="name" class="field" placeholder="e.g. Green Field Sports Arena" required minlength="3" /></div>
+              <div class="form-row">
+                <label>Description *</label>
+                <textarea id="description" class="field" placeholder="Describe your turf, facilities, nearby landmarks…" required maxlength="1000"></textarea>
+                <div class="form-hint"><span id="descCount">0</span>/1000 characters</div>
+              </div>
+              <div class="form-row"><label>Contact number *</label><input type="tel" id="contactNumber" class="field" placeholder="9876543210" required pattern="[6-9][0-9]{9}" /></div>
+            </div>
+          </div></div>
+
+          <div class="card"><div class="card-body">
+            <h4 class="mb-4">Location</h4>
+            <div class="form-stack">
+              <div class="form-row"><label>Street address *</label><input type="text" id="street" class="field" placeholder="123 Main Road, Near Stadium" required /></div>
+              <div class="form-grid-3">
+                <div class="form-row"><label>City *</label><input type="text" id="city" class="field" placeholder="Mumbai" required /></div>
+                <div class="form-row"><label>State</label><input type="text" id="state" class="field" placeholder="Maharashtra" /></div>
+                <div class="form-row"><label>PIN code</label><input type="text" id="pincode" class="field" placeholder="400001" pattern="[0-9]{6}" /></div>
+              </div>
+            </div>
+          </div></div>
+
+          <div class="card"><div class="card-body">
+            <h4 class="mb-4">Amenities</h4>
+            <div class="amenity-grid">
+              <label class="amenity-lbl" data-amenity="Parking">
+                <input type="checkbox" name="amenities" value="Parking" onchange="updateAmenityStyle(this)" />
+                <span>Parking</span>
+              </label>
+              <label class="amenity-lbl" data-amenity="Changing Rooms">
+                <input type="checkbox" name="amenities" value="Changing Rooms" onchange="updateAmenityStyle(this)" />
+                <span>Changing Rooms</span>
+              </label>
+              <label class="amenity-lbl" data-amenity="Drinking Water">
+                <input type="checkbox" name="amenities" value="Drinking Water" onchange="updateAmenityStyle(this)" />
+                <span>Drinking Water</span>
+              </label>
+              <label class="amenity-lbl" data-amenity="Floodlights">
+                <input type="checkbox" name="amenities" value="Floodlights" onchange="updateAmenityStyle(this)" />
+                <span>Floodlights</span>
+              </label>
+              <label class="amenity-lbl" data-amenity="Washrooms">
+                <input type="checkbox" name="amenities" value="Washrooms" onchange="updateAmenityStyle(this)" />
+                <span>Washrooms</span>
+              </label>
+              <label class="amenity-lbl" data-amenity="Cafeteria">
+                <input type="checkbox" name="amenities" value="Cafeteria" onchange="updateAmenityStyle(this)" />
+                <span>Cafeteria</span>
+              </label>
+              <label class="amenity-lbl" data-amenity="First Aid">
+                <input type="checkbox" name="amenities" value="First Aid" onchange="updateAmenityStyle(this)" />
+                <span>First Aid</span>
+              </label>
+              <label class="amenity-lbl" data-amenity="Wi-Fi">
+                <input type="checkbox" name="amenities" value="Wi-Fi" onchange="updateAmenityStyle(this)" />
+                <span>Wi-Fi</span>
+              </label>
+            </div>
+          </div></div>
+        </div>
+
+        <div class="add-turf-side">
+          <div class="card"><div class="card-body">
+            <h4 class="mb-4">Turf images</h4>
+            <div class="upload-zone" id="uploadArea" onclick="document.getElementById('imageInput').click()"
+                 ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragleave="handleDragLeave(event)">
+              <div class="upload-zone-icon">📷</div>
+              <div class="upload-zone-txt">Click or drag images here</div>
+              <div class="upload-zone-sub">JPEG, PNG, WebP · Max 5MB each · Up to 5 images</div>
+            </div>
+            <input type="file" id="imageInput" multiple accept="image/*" style="display:none;" onchange="handleImageSelect(event)" />
+            <div id="imagePreviews" class="img-preview-grid"></div>
+          </div></div>
+
+          <div class="card"><div class="card-body">
+            <div id="formError" class="alert alert-error hidden mb-3"></div>
+            <button type="submit" class="btn btn-primary btn-lg w-full" id="submitBtn">Save turf</button>
+            <p class="text-xs text-muted text-center mt-3">You can add sports and pricing after saving</p>
+          </div></div>
+        </div>
+      </div>
+    </form>
+  </main>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error();
+if (!Auth.isOwner()) window.location.href = 'customer-dashboard.html';
+
+const editId = Utils.getQueryParam('id');
+let selectedFiles = [];
+
+if (editId) {
+  document.getElementById('pageTitle').textContent = 'Edit turf';
+  loadTurfData();
+}
+
+async function loadTurfData() {
+  try {
+    const res = await API.get(`/turfs/${editId}`);
+    const turf = res.data;
+    document.getElementById('name').value = turf.name || '';
+    document.getElementById('description').value = turf.description || '';
+    document.getElementById('contactNumber').value = turf.contactNumber || '';
+    document.getElementById('street').value = turf.address?.street || '';
+    document.getElementById('city').value = turf.address?.city || '';
+    document.getElementById('state').value = turf.address?.state || '';
+    document.getElementById('pincode').value = turf.address?.pincode || '';
+    updateDescCount();
+
+    (turf.amenities || []).forEach(a => {
+      const cb = document.querySelector(`input[name="amenities"][value="${a}"]`);
+      if (cb) { cb.checked = true; updateAmenityStyle(cb); }
+    });
+
+    if (turf.images?.length) {
+      document.getElementById('imagePreviews').innerHTML = turf.images.map(img => `
+        <div class="img-preview">
+          <img src="http://localhost:5000${img.url}" />
+          ${img.isPrimary ? '<span class="img-primary-tag">Main</span>' : ''}
+        </div>`).join('');
+    }
+  } catch (err) { Toast.error('Could not load turf data'); }
+}
+
+function updateDescCount() { document.getElementById('descCount').textContent = document.getElementById('description').value.length; }
+document.getElementById('description').addEventListener('input', updateDescCount);
+
+function updateAmenityStyle(cb) {
+  cb.closest('.amenity-lbl').classList.toggle('checked', cb.checked);
+}
+
+function handleImageSelect(e) { addFiles(Array.from(e.target.files)); }
+function handleDragOver(e) { e.preventDefault(); document.getElementById('uploadArea').classList.add('drag'); }
+function handleDragLeave() { document.getElementById('uploadArea').classList.remove('drag'); }
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadArea').classList.remove('drag');
+  addFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')));
+}
+
+function addFiles(files) {
+  const remaining = 5 - selectedFiles.length;
+  selectedFiles = [...selectedFiles, ...files.slice(0, remaining)];
+  renderPreviews();
+}
+
+function renderPreviews() {
+  document.getElementById('imagePreviews').innerHTML = selectedFiles.map((file, i) => {
+    const url = URL.createObjectURL(file);
+    return `
+      <div class="img-preview">
+        <img src="${url}" />
+        ${i === 0 ? '<span class="img-primary-tag">Main</span>' : ''}
+        <button type="button" class="img-preview-rm" onclick="removeFile(${i})">✕</button>
+      </div>`;
+  }).join('');
+}
+
+function removeFile(idx) { selectedFiles.splice(idx, 1); renderPreviews(); }
+
+async function handleSubmit(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  const errEl = document.getElementById('formError');
+  errEl.classList.add('hidden');
+
+  const amenities = Array.from(document.querySelectorAll('input[name="amenities"]:checked')).map(c => c.value);
+
+  const formData = new FormData();
+  formData.append('name', document.getElementById('name').value.trim());
+  formData.append('description', document.getElementById('description').value.trim());
+  formData.append('contactNumber', document.getElementById('contactNumber').value.trim());
+  formData.append('street', document.getElementById('street').value.trim());
+  formData.append('city', document.getElementById('city').value.trim());
+  formData.append('state', document.getElementById('state').value.trim());
+  formData.append('pincode', document.getElementById('pincode').value.trim());
+  amenities.forEach(a => formData.append('amenities', a));
+  selectedFiles.forEach(f => formData.append('images', f));
+
+  Utils.setButtonLoading(btn, true, editId ? 'Updating…' : 'Saving…');
+  try {
+    if (editId) { await API.upload(`/turfs/${editId}`, formData, 'PUT'); Toast.success('Turf updated'); }
+    else { await API.upload('/turfs', formData); Toast.success('Turf created. Add sports to start accepting bookings.'); }
+    setTimeout(() => window.location.href = 'my-turfs.html', 900);
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.classList.remove('hidden');
+    Utils.setButtonLoading(btn, false);
+  }
+}
+</script>
+</body>
+</html>

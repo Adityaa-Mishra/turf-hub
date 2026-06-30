@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Create Account — TurfHub</title>
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-left">
+    <div class="auth-left-content">
+      <div class="auth-brand">
+        <div class="auth-brand-mark">⚡</div>
+        <div class="auth-brand-name">TurfHub</div>
+      </div>
+      <div class="auth-tagline">Start booking in under a minute</div>
+      <p class="auth-tagline-sub">Whether you're playing this weekend or listing your venue, TurfHub gets you set up fast.</p>
+      <ul class="auth-feature-list">
+        <li>Free for players, forever</li>
+        <li>List your turf in minutes</li>
+        <li>Manage bookings from one dashboard</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="auth-right">
+    <div class="auth-box" style="max-width:420px;">
+      <a href="../../index.html" class="auth-logo-sm">
+        <div class="auth-logo-mark">⚡</div>
+        <span class="auth-logo-name">TurfHub</span>
+      </a>
+
+      <h1 class="auth-h">Create your account</h1>
+      <p class="auth-sub">Join as a player or list your venue</p>
+
+      <form class="auth-form" id="registerForm" onsubmit="handleRegister(event)">
+        <div class="form-row">
+          <label>I want to join as</label>
+          <div class="role-grid">
+            <div class="role-opt">
+              <input type="radio" name="role" value="customer" id="roleCustomer" checked />
+              <label for="roleCustomer" class="role-lbl">
+                <span class="role-lbl-icon">⚽</span>
+                <span class="role-lbl-name">Player</span>
+                <span class="role-lbl-desc">Book turfs</span>
+              </label>
+            </div>
+            <div class="role-opt">
+              <input type="radio" name="role" value="owner" id="roleOwner" />
+              <label for="roleOwner" class="role-lbl">
+                <span class="role-lbl-icon">🏟️</span>
+                <span class="role-lbl-name">Turf owner</span>
+                <span class="role-lbl-desc">List turfs</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label for="name">Full name</label>
+            <input type="text" id="name" class="field" placeholder="Rahul Sharma" required minlength="2" />
+          </div>
+          <div class="form-row">
+            <label for="phone">Phone number</label>
+            <input type="tel" id="phone" class="field" placeholder="9876543210" pattern="[6-9][0-9]{9}" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="email">Email address</label>
+          <input type="email" id="email" class="field" placeholder="you@example.com" required autocomplete="email" />
+        </div>
+
+        <div class="form-row">
+          <label for="city">City</label>
+          <input type="text" id="city" class="field" placeholder="Mumbai, Delhi, Bangalore…" />
+        </div>
+
+        <div class="form-row">
+          <label for="password">Password</label>
+          <div class="field-icon-wrap">
+            <input type="password" id="password" class="field" placeholder="Min. 6 characters" required minlength="6" />
+            <span class="fi fi-right" onclick="togglePwd('password')">👁</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="confirmPassword">Confirm password</label>
+          <div class="field-icon-wrap">
+            <input type="password" id="confirmPassword" class="field" placeholder="Repeat password" required />
+            <span class="fi fi-right" onclick="togglePwd('confirmPassword')">👁</span>
+          </div>
+        </div>
+
+        <div id="formError" class="alert alert-error hidden"></div>
+
+        <button type="submit" class="btn btn-primary btn-lg w-full" id="submitBtn">Create account</button>
+
+        <p class="text-center text-xs text-muted">
+          By signing up you agree to our <a href="#" class="text-blue">Terms</a> and <a href="#" class="text-blue">Privacy Policy</a>
+        </p>
+      </form>
+
+      <div class="auth-divider">or</div>
+
+      <p class="text-center text-sm text-muted">
+        Already have an account? <a href="login.html" class="text-blue font-semi">Sign in →</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+if (Auth.isLoggedIn()) window.location.href = Auth.isOwner() ? 'owner-dashboard.html' : 'customer-dashboard.html';
+
+const roleParam = Utils.getQueryParam('role');
+if (roleParam === 'owner') document.getElementById('roleOwner').checked = true;
+
+function togglePwd(id) {
+  const el = document.getElementById(id);
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  const errorEl = document.getElementById('formError');
+  errorEl.classList.add('hidden');
+
+  const name = document.getElementById('name').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  const city = document.getElementById('city').value.trim();
+  const password = document.getElementById('password').value;
+  const confirmPassword = document.getElementById('confirmPassword').value;
+  const role = document.querySelector('input[name="role"]:checked').value;
+
+  if (password !== confirmPassword) {
+    errorEl.textContent = 'Passwords do not match.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  Utils.setButtonLoading(btn, true, 'Creating account…');
+  try {
+    const res = await API.post('/auth/register', { name, email, phone, city, password, role });
+    Auth.setSession(res.token, res.user);
+    Toast.success(`Welcome to TurfHub, ${res.user.name}`);
+    setTimeout(() => { window.location.href = role === 'owner' ? 'owner-dashboard.html' : 'customer-dashboard.html'; }, 700);
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('hidden');
+    Utils.setButtonLoading(btn, false);
+  }
+}
+</script>
+</body>
+</html>

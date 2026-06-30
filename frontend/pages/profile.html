@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>My Profile — TurfHub</title>
+<link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<nav class="nav" id="navbar"></nav>
+<div class="dash-layout">
+  <aside class="sidebar">
+    <ul class="sb-nav">
+      <li id="dashboardLink"><a href="#"><span class="ic">▦</span> Dashboard</a></li>
+      <li id="bookingsLink"><a href="#"><span class="ic">▤</span> Bookings</a></li>
+      <div class="sb-section-lbl">Account</div>
+      <li><a href="profile.html" class="on"><span class="ic">◐</span> Profile</a></li>
+    </ul>
+  </aside>
+
+  <main class="dash-content" style="max-width:680px;">
+    <div class="mb-6">
+      <h1 class="dash-title">My profile</h1>
+      <p class="dash-sub">Manage your account information</p>
+    </div>
+
+    <div class="card mb-5"><div class="card-body">
+      <div class="flex items-center gap-4 mb-6">
+        <div id="avatarDisplay" class="av-lg">–</div>
+        <div>
+          <div id="profileName" style="font-size:1.125rem;font-weight:700;font-family:var(--font-display);">Loading…</div>
+          <div id="profileEmail" class="text-sm text-muted"></div>
+          <div id="profileRole" class="mt-2"></div>
+        </div>
+      </div>
+
+      <form id="profileForm" onsubmit="saveProfile(event)">
+        <div class="form-stack">
+          <div class="form-grid-2">
+            <div class="form-row"><label>Full name</label><input type="text" id="name" class="field" placeholder="Your full name" minlength="2" required /></div>
+            <div class="form-row"><label>Phone number</label><input type="tel" id="phone" class="field" placeholder="9876543210" pattern="[6-9][0-9]{9}" /></div>
+          </div>
+          <div class="form-row"><label>City</label><input type="text" id="city" class="field" placeholder="Your city" /></div>
+          <div class="form-row">
+            <label>Email address</label>
+            <input type="email" id="email" class="field" disabled />
+            <div class="form-hint">Email cannot be changed</div>
+          </div>
+
+          <div id="profileError" class="alert alert-error hidden"></div>
+          <div id="profileSuccess" class="alert alert-success hidden">Profile updated successfully</div>
+
+          <button type="submit" class="btn btn-primary" id="saveProfileBtn" style="align-self:flex-start;min-width:150px;">Save changes</button>
+        </div>
+      </form>
+    </div></div>
+
+    <div class="card mb-5">
+      <div class="card-header"><h3>Change password</h3></div>
+      <div class="card-body">
+        <form id="passwordForm" onsubmit="changePassword(event)">
+          <div class="form-stack">
+            <div class="form-row"><label>Current password</label><input type="password" id="currentPassword" class="field" placeholder="••••••••" required /></div>
+            <div class="form-grid-2">
+              <div class="form-row"><label>New password</label><input type="password" id="newPassword" class="field" placeholder="Min 6 characters" required minlength="6" /></div>
+              <div class="form-row"><label>Confirm new password</label><input type="password" id="confirmNewPassword" class="field" placeholder="Repeat new password" required /></div>
+            </div>
+            <div id="pwdError" class="alert alert-error hidden"></div>
+            <button type="submit" class="btn btn-secondary" id="savePwdBtn" style="align-self:flex-start;min-width:150px;">Update password</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card" style="border-color:#FECACA;">
+      <div class="card-header" style="background:var(--red-pale);"><h3 class="text-red">Account actions</h3></div>
+      <div class="card-body">
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <div class="font-semi" style="margin-bottom:2px;">Sign out</div>
+            <div class="text-xs text-muted">This will log you out from the current session</div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="logout()">Sign out</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error();
+
+const user = Auth.getUser();
+document.getElementById('dashboardLink').querySelector('a').href = Auth.isOwner() ? 'owner-dashboard.html' : 'customer-dashboard.html';
+document.getElementById('bookingsLink').querySelector('a').href = Auth.isOwner() ? 'booking-requests.html' : 'bookings.html';
+
+async function loadProfile() {
+  try {
+    const res = await API.get('/auth/me');
+    const u = res.user;
+    document.getElementById('avatarDisplay').textContent = Utils.getInitials(u.name);
+    document.getElementById('profileName').textContent = u.name;
+    document.getElementById('profileEmail').textContent = u.email;
+    document.getElementById('profileRole').innerHTML = `<span class="badge ${u.role==='owner'?'badge-owner':'badge-customer'}">${u.role==='owner'?'Turf Owner':'Player'}</span>`;
+    document.getElementById('name').value = u.name || '';
+    document.getElementById('phone').value = u.phone || '';
+    document.getElementById('city').value = u.city || '';
+    document.getElementById('email').value = u.email || '';
+  } catch (err) { Toast.error('Could not load profile'); }
+}
+
+async function saveProfile(e) {
+  e.preventDefault();
+  const btn = document.getElementById('saveProfileBtn');
+  const errEl = document.getElementById('profileError');
+  const successEl = document.getElementById('profileSuccess');
+  errEl.classList.add('hidden'); successEl.classList.add('hidden');
+
+  Utils.setButtonLoading(btn, true, 'Saving…');
+  try {
+    const res = await API.put('/auth/profile', {
+      name: document.getElementById('name').value.trim(),
+      phone: document.getElementById('phone').value.trim(),
+      city: document.getElementById('city').value.trim()
+    });
+    const updated = { ...Auth.getUser(), ...res.user };
+    localStorage.setItem('turfhub_user', JSON.stringify(updated));
+    document.getElementById('avatarDisplay').textContent = Utils.getInitials(res.user.name);
+    document.getElementById('profileName').textContent = res.user.name;
+    successEl.classList.remove('hidden');
+    Toast.success('Profile updated');
+  } catch (err) {
+    errEl.textContent = err.message; errEl.classList.remove('hidden');
+  } finally { Utils.setButtonLoading(btn, false); }
+}
+
+async function changePassword(e) {
+  e.preventDefault();
+  const btn = document.getElementById('savePwdBtn');
+  const errEl = document.getElementById('pwdError');
+  errEl.classList.add('hidden');
+
+  const newPwd = document.getElementById('newPassword').value;
+  const confirmPwd = document.getElementById('confirmNewPassword').value;
+  if (newPwd !== confirmPwd) { errEl.textContent = 'New passwords do not match.'; errEl.classList.remove('hidden'); return; }
+
+  Utils.setButtonLoading(btn, true, 'Updating…');
+  try {
+    await API.put('/auth/change-password', { currentPassword: document.getElementById('currentPassword').value, newPassword: newPwd });
+    document.getElementById('passwordForm').reset();
+    Toast.success('Password updated');
+  } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+  finally { Utils.setButtonLoading(btn, false); }
+}
+
+function logout() {
+  Auth.logout();
+  Toast.info('Signed out');
+  setTimeout(() => window.location.href = '../../index.html', 600);
+}
+
+loadProfile();
+</script>
+</body>
+</html>

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>My Bookings — TurfHub</title>
+<link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<nav class="nav" id="navbar"></nav>
+<div class="dash-layout">
+  <aside class="sidebar">
+    <ul class="sb-nav">
+      <li><a href="customer-dashboard.html"><span class="ic">▦</span> Dashboard</a></li>
+      <li><a href="bookings.html" class="on"><span class="ic">▤</span> My Bookings</a></li>
+      <li><a href="turfs.html"><span class="ic">⌕</span> Browse Turfs</a></li>
+      <div class="sb-section-lbl">Account</div>
+      <li><a href="profile.html"><span class="ic">◐</span> Profile</a></li>
+    </ul>
+  </aside>
+
+  <main class="dash-content">
+    <div class="dash-header">
+      <div>
+        <h1 class="dash-title">My bookings</h1>
+        <p class="dash-sub">Track all your booking requests and history</p>
+      </div>
+      <a href="turfs.html" class="btn btn-primary btn-sm">+ New booking</a>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn on" onclick="switchTab(this,'')">All</button>
+      <button class="tab-btn" onclick="switchTab(this,'pending')">Pending</button>
+      <button class="tab-btn" onclick="switchTab(this,'accepted')">Confirmed</button>
+      <button class="tab-btn" onclick="switchTab(this,'declined')">Declined</button>
+      <button class="tab-btn" onclick="switchTab(this,'cancelled')">Cancelled</button>
+    </div>
+
+    <div id="bookingsContainer"><div class="loading-box"><div class="spin spin-lg"></div></div></div>
+    <div id="pagination" class="pagination"></div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="cancelModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head"><h3>Cancel booking</h3><button class="modal-x" onclick="Modal.close('cancelModal')">✕</button></div>
+    <div class="modal-body">
+      <p class="text-sm text-muted mb-3">Are you sure you want to cancel this booking?</p>
+      <div class="form-row">
+        <label>Reason (optional)</label>
+        <textarea id="cancelReason" class="field" placeholder="Plans changed, emergency…" style="min-height:64px;"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="Modal.close('cancelModal')">Keep booking</button>
+      <button class="btn btn-danger" id="confirmCancelBtn" onclick="confirmCancel()">Yes, cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="qrModal">
+  <div class="modal" style="max-width:320px;text-align:center;">
+    <div class="modal-head"><h3>Booking QR code</h3><button class="modal-x" onclick="Modal.close('qrModal')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;align-items:center;gap:14px;">
+      <img id="qrImage" style="width:190px;height:190px;" />
+      <p class="text-xs text-muted">Show this QR code at the venue</p>
+      <button class="btn btn-secondary btn-sm" onclick="downloadQR()">Download</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error();
+if (!Auth.isCustomer()) window.location.href = 'owner-dashboard.html';
+
+let currentStatus = Utils.getQueryParam('status') || '';
+let currentPage = 1, cancelBookingId = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (currentStatus) {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      const match = btn.getAttribute('onclick')?.match(/'([^']*)'/);
+      if (match && match[1] === currentStatus) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('on')); btn.classList.add('on'); }
+    });
+  }
+  loadBookings();
+});
+
+function switchTab(btn, status) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  currentStatus = status; currentPage = 1;
+  loadBookings();
+}
+
+async function loadBookings(page = 1) {
+  currentPage = page;
+  const container = document.getElementById('bookingsContainer');
+  container.innerHTML = `<div class="loading-box" style="padding:48px;"><div class="spin spin-lg"></div></div>`;
+  try {
+    const params = { page, limit: 8 };
+    if (currentStatus) params.status = currentStatus;
+    const res = await API.get('/bookings', params);
+    const { data: bookings, totalPages } = res;
+
+    if (!bookings.length) {
+      container.innerHTML = `<div class="empty"><div class="empty-ico">📅</div><h3>No ${currentStatus || ''} bookings found</h3><p>${currentStatus === 'pending' ? 'Your pending requests will show here' : 'Start booking turfs to see your history'}</p><a href="turfs.html" class="btn btn-primary mt-3">Browse turfs</a></div>`;
+      document.getElementById('pagination').innerHTML = '';
+      return;
+    }
+    container.innerHTML = bookings.map(renderBookingCard).join('');
+    renderPagination(page, totalPages);
+  } catch (err) {
+    container.innerHTML = `<div class="empty"><div class="empty-ico">⚠️</div><h3>${err.message}</h3></div>`;
+  }
+}
+
+function renderBookingCard(b) {
+  const imgUrl = b.turf?.images?.[0] ? `http://localhost:5000${b.turf.images[0].url}` : null;
+  const canCancel = ['pending','accepted'].includes(b.status);
+  const isFuture = b.bookingDate && new Date(b.bookingDate) >= new Date();
+
+  return `
+    <div class="bk-card">
+      <div class="bk-head">
+        <div class="flex items-center gap-2">
+          <span style="font-size:1.125rem;">${Utils.getSportIcon(b.turfSport?.sportName)}</span>
+          <div><div class="font-bold text-sm">${b.turfSport?.sportName || 'Booking'}</div><div class="text-xs text-muted">#${b._id.slice(-6).toUpperCase()}</div></div>
+        </div>
+        ${Utils.getStatusBadge(b.status)}
+      </div>
+      <div class="bk-body">
+        ${imgUrl ? `<img src="${imgUrl}" class="bk-thumb" alt="${b.turf?.name}" onerror="this.style.display='none'" />` : '<div class="bk-thumb" style="display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🏟️</div>'}
+        <div style="flex:1;">
+          <div class="bk-name"><a href="turf-detail.html?id=${b.turf?._id}" style="color:inherit;">${b.turf?.name || 'Unknown turf'}</a></div>
+          <div class="bk-meta">
+            <span>${b.turf?.address?.city || '–'}</span>
+            <span>${Utils.formatDate(b.bookingDate)}</span>
+            <span>${Utils.formatTime(b.startTime)} – ${Utils.formatTime(b.endTime)}</span>
+          </div>
+          ${b.turf?.contactNumber ? `<div class="text-xs text-muted">${b.turf.contactNumber}</div>` : ''}
+          ${b.cancelReason ? `<div class="text-xs text-red mt-1">Reason: ${b.cancelReason}</div>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div class="bk-amount">${Utils.formatCurrency(b.amount)}</div>
+          <div class="text-xs text-muted mt-1">${Utils.formatDate(b.createdAt)}</div>
+        </div>
+      </div>
+      <div class="bk-actions">
+        ${b.qrCode && b.status === 'accepted' && isFuture ? `<button class="btn btn-secondary btn-sm" onclick="showQR('${b.qrCode}')">QR code</button>` : ''}
+        ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="openCancel('${b._id}')">Cancel</button>` : ''}
+        <a href="turf-detail.html?id=${b.turf?._id}" class="btn btn-ghost btn-sm">View turf</a>
+      </div>
+    </div>`;
+}
+
+function openCancel(id) { cancelBookingId = id; document.getElementById('cancelReason').value=''; Modal.open('cancelModal'); }
+
+async function confirmCancel() {
+  const btn = document.getElementById('confirmCancelBtn');
+  Utils.setButtonLoading(btn, true, 'Cancelling…');
+  try {
+    await API.delete(`/bookings/${cancelBookingId}`, { reason: document.getElementById('cancelReason').value.trim() });
+    Modal.close('cancelModal');
+    Toast.info('Booking cancelled');
+    loadBookings(currentPage);
+  } catch (err) { Toast.error(err.message); Utils.setButtonLoading(btn, false); }
+}
+
+function showQR(qrCode) { document.getElementById('qrImage').src = qrCode; Modal.open('qrModal'); }
+function downloadQR() {
+  const a = document.createElement('a');
+  a.href = document.getElementById('qrImage').src;
+  a.download = 'turfhub-booking-qr.png';
+  a.click();
+}
+
+function renderPagination(current, total) {
+  const container = document.getElementById('pagination');
+  if (total <= 1) { container.innerHTML = ''; return; }
+  let html = `<button class="pg-btn" onclick="loadBookings(${current-1})" ${current===1?'disabled':''}>←</button>`;
+  for (let i = 1; i <= total; i++) {
+    if (i === 1 || i === total || Math.abs(i-current) <= 1) html += `<button class="pg-btn ${i===current?'on':''}" onclick="loadBookings(${i})">${i}</button>`;
+    else if (Math.abs(i-current) === 2) html += `<span style="padding:0 4px;color:var(--ink-4);">…</span>`;
+  }
+  html += `<button class="pg-btn" onclick="loadBookings(${current+1})" ${current===total?'disabled':''}>→</button>`;
+  container.innerHTML = html;
+}
+</script>
+</body>
+</html>

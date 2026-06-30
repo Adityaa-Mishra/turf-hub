@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Booking Requests — TurfHub</title>
+<link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<nav class="nav" id="navbar"></nav>
+<div class="dash-layout">
+  <aside class="sidebar">
+    <ul class="sb-nav">
+      <li><a href="owner-dashboard.html"><span class="ic">▦</span> Dashboard</a></li>
+      <li><a href="my-turfs.html"><span class="ic">⬚</span> My Turfs</a></li>
+      <li><a href="add-turf.html"><span class="ic">+</span> Add Turf</a></li>
+      <li><a href="booking-requests.html" class="on"><span class="ic">▤</span> Booking Requests</a></li>
+    </ul>
+  </aside>
+
+  <main class="dash-content">
+    <div class="mb-6">
+      <h1 class="dash-title">Booking requests</h1>
+      <p class="dash-sub">Manage customer booking requests</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn on" onclick="switchTab(this,'pending')">Pending</button>
+      <button class="tab-btn" onclick="switchTab(this,'accepted')">Confirmed</button>
+      <button class="tab-btn" onclick="switchTab(this,'declined')">Declined</button>
+      <button class="tab-btn" onclick="switchTab(this,'')">All</button>
+    </div>
+
+    <div id="bookingsContainer"><div class="loading-box"><div class="spin spin-lg"></div></div></div>
+    <div id="pagination" class="pagination"></div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="declineModal">
+  <div class="modal">
+    <div class="modal-head"><h3>Decline booking</h3><button class="modal-x" onclick="Modal.close('declineModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>Reason for declining (optional)</label>
+        <textarea id="declineReason" class="field" placeholder="e.g. Turf maintenance, already booked…" style="min-height:76px;"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="Modal.close('declineModal')">Cancel</button>
+      <button class="btn btn-danger" id="confirmDeclineBtn" onclick="confirmDecline()">Decline booking</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error();
+if (!Auth.isOwner()) window.location.href = 'customer-dashboard.html';
+
+let currentStatus = Utils.getQueryParam('status') || 'pending';
+let currentPage = 1, declineBookingId = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.tab-btn').forEach(tab => {
+    const status = tab.getAttribute('onclick').match(/'([^']*)'/)?.[1];
+    if (status === currentStatus) { document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('on')); tab.classList.add('on'); }
+  });
+  loadBookings();
+});
+
+function switchTab(btn, status) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  currentStatus = status; currentPage = 1;
+  loadBookings();
+}
+
+async function loadBookings(page = 1) {
+  currentPage = page;
+  const container = document.getElementById('bookingsContainer');
+  container.innerHTML = `<div class="loading-box"><div class="spin spin-lg"></div></div>`;
+  try {
+    const params = { page, limit: 10 };
+    if (currentStatus) params.status = currentStatus;
+    const res = await API.get('/bookings', params);
+    const { data: bookings, totalPages } = res;
+
+    if (!bookings.length) {
+      container.innerHTML = `<div class="empty"><div class="empty-ico">▤</div><h3>No ${currentStatus || ''} bookings</h3><p>Bookings will appear here once customers make requests</p></div>`;
+      document.getElementById('pagination').innerHTML = '';
+      return;
+    }
+    container.innerHTML = bookings.map(renderBookingCard).join('');
+    renderPagination(page, totalPages);
+  } catch (err) {
+    container.innerHTML = `<div class="empty"><div class="empty-ico">⚠️</div><h3>${err.message}</h3></div>`;
+  }
+}
+
+function renderBookingCard(b) {
+  const imgUrl = b.turf?.images?.[0] ? `http://localhost:5000${b.turf.images[0].url}` : null;
+  return `
+    <div class="bk-card">
+      <div class="bk-head">
+        <div class="flex items-center gap-3">
+          <div class="av">${Utils.getInitials(b.user?.name)}</div>
+          <div><div class="font-bold text-sm">${b.user?.name || 'Customer'}</div><div class="text-xs text-muted">${b.user?.phone || b.user?.email || ''}</div></div>
+        </div>
+        <div class="flex items-center gap-3">
+          ${Utils.getStatusBadge(b.status)}
+          <span class="text-xs text-muted">#${b._id.slice(-6)}</span>
+        </div>
+      </div>
+      <div class="bk-body">
+        ${imgUrl ? `<img src="${imgUrl}" class="bk-thumb" onerror="this.style.display='none'" />` : '<div class="bk-thumb" style="display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🏟️</div>'}
+        <div style="flex:1;">
+          <div class="bk-name">${b.turf?.name || 'Unknown turf'}</div>
+          <div class="bk-meta">
+            <span>${Utils.getSportIcon(b.turfSport?.sportName)} <b>${b.turfSport?.sportName || '–'}</b></span>
+            <span>${Utils.formatDate(b.bookingDate)}</span>
+            <span>${Utils.formatTime(b.startTime)} – ${Utils.formatTime(b.endTime)}</span>
+            <span>${b.turf?.address?.city || ''}</span>
+          </div>
+          ${b.notes ? `<div class="text-xs text-muted" style="font-style:italic;">Note: ${b.notes}</div>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div class="bk-amount">${Utils.formatCurrency(b.amount)}</div>
+          <div class="text-xs text-muted mt-1">${Utils.formatDate(b.createdAt)}</div>
+        </div>
+      </div>
+      ${b.status === 'pending' ? `
+      <div class="bk-actions">
+        <button class="btn btn-danger btn-sm" onclick="openDecline('${b._id}')">Decline</button>
+        <button class="btn btn-primary btn-sm" onclick="acceptBooking('${b._id}')">Accept</button>
+      </div>` : b.cancelReason ? `<div style="padding:10px 18px;border-top:1px solid var(--border);font-size:0.8rem;color:var(--ink-3);">Reason: ${b.cancelReason}</div>` : ''}
+    </div>`;
+}
+
+async function acceptBooking(id) {
+  try { await API.put(`/bookings/${id}/accept`); Toast.success('Booking accepted'); loadBookings(currentPage); }
+  catch (err) { Toast.error(err.message); }
+}
+
+function openDecline(id) {
+  declineBookingId = id;
+  document.getElementById('declineReason').value = '';
+  Modal.open('declineModal');
+}
+
+async function confirmDecline() {
+  const btn = document.getElementById('confirmDeclineBtn');
+  Utils.setButtonLoading(btn, true, 'Declining…');
+  try {
+    await API.put(`/bookings/${declineBookingId}/decline`, { reason: document.getElementById('declineReason').value.trim() });
+    Modal.close('declineModal');
+    Toast.info('Booking declined');
+    loadBookings(currentPage);
+  } catch (err) { Toast.error(err.message); Utils.setButtonLoading(btn, false); }
+}
+
+function renderPagination(current, total) {
+  const container = document.getElementById('pagination');
+  if (total <= 1) { container.innerHTML = ''; return; }
+  let html = `<button class="pg-btn" onclick="loadBookings(${current-1})" ${current===1?'disabled':''}>←</button>`;
+  for (let i = 1; i <= total; i++) html += `<button class="pg-btn ${i===current?'on':''}" onclick="loadBookings(${i})">${i}</button>`;
+  html += `<button class="pg-btn" onclick="loadBookings(${current+1})" ${current===total?'disabled':''}>→</button>`;
+  container.innerHTML = html;
+}
+</script>
+</body>
+</html>

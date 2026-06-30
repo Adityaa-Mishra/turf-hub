@@ -1,0 +1,9 @@
+node_modules/
+.env
+uploads/turfs/*
+!uploads/turfs/.gitkeep
+*.log
+.DS_Store
+Thumbs.db
+dist/
+.cache/

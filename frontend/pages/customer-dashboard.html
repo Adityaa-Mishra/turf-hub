@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My Dashboard — TurfHub</title>
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<nav class="nav" id="navbar"></nav>
+
+<div class="dash-layout">
+  <aside class="sidebar">
+    <ul class="sb-nav">
+      <li><a href="customer-dashboard.html" class="on"><span class="ic">▦</span> Dashboard</a></li>
+      <li><a href="bookings.html"><span class="ic">▤</span> My Bookings</a></li>
+      <li><a href="turfs.html"><span class="ic">⌕</span> Browse Turfs</a></li>
+      <div class="sb-section-lbl">Account</div>
+      <li><a href="profile.html"><span class="ic">◐</span> Profile</a></li>
+    </ul>
+  </aside>
+
+  <main class="dash-content">
+    <div class="dash-header">
+      <div>
+        <h1 class="dash-title">Dashboard</h1>
+        <p class="dash-sub" id="welcomeMsg">Loading…</p>
+      </div>
+      <a href="turfs.html" class="btn btn-primary">Book a turf</a>
+    </div>
+
+    <div class="stats-grid mb-6" id="statsGrid">
+      <div class="stat-card"><div class="stat-icon si-blue">▤</div><div><div class="skel" style="height:24px;width:42px;"></div><div class="stat-lbl mt-2">Total bookings</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-amber">◷</div><div><div class="skel" style="height:24px;width:42px;"></div><div class="stat-lbl mt-2">Pending</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-green">✓</div><div><div class="skel" style="height:24px;width:42px;"></div><div class="stat-lbl mt-2">Upcoming</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-red">✕</div><div><div class="skel" style="height:24px;width:42px;"></div><div class="stat-lbl mt-2">Cancelled</div></div></div>
+    </div>
+
+    <div class="card mb-6">
+      <div class="card-header">
+        <h3>Upcoming games</h3>
+        <a href="bookings.html?status=accepted" class="text-blue text-sm font-semi">View all</a>
+      </div>
+      <div id="upcomingBookings" style="padding:20px;">
+        <div class="loading-box"><div class="spin"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>Recent activity</h3>
+        <a href="bookings.html" class="text-blue text-sm font-semi">View all</a>
+      </div>
+      <div id="recentBookings" style="padding:20px;">
+        <div class="loading-box"><div class="spin"></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error('redirect');
+if (!Auth.isCustomer()) window.location.href = 'owner-dashboard.html';
+
+const user = Auth.getUser();
+document.getElementById('welcomeMsg').textContent = `Welcome back, ${user?.name?.split(' ')[0]}`;
+
+async function loadDashboard() {
+  try {
+    const res = await API.get('/dashboard/customer');
+    const { stats, recentBookings, nextBookings } = res.data;
+
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="stat-card"><div class="stat-icon si-blue">▤</div><div><div class="stat-val">${stats.totalBookings}</div><div class="stat-lbl">Total bookings</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-amber">◷</div><div><div class="stat-val">${stats.pendingBookings}</div><div class="stat-lbl">Pending</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-green">✓</div><div><div class="stat-val">${stats.upcomingBookings}</div><div class="stat-lbl">Upcoming</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-red">✕</div><div><div class="stat-val">${stats.cancelledBookings}</div><div class="stat-lbl">Cancelled</div></div></div>`;
+
+    const upcomingEl = document.getElementById('upcomingBookings');
+    if (!nextBookings.length) {
+      upcomingEl.innerHTML = `<div class="empty"><div class="empty-ico">📅</div><h3>No upcoming games</h3><p>Book your next session</p><a href="turfs.html" class="btn btn-primary btn-sm mt-3">Browse turfs</a></div>`;
+    } else {
+      upcomingEl.innerHTML = nextBookings.map(renderBookingCard).join('');
+    }
+
+    const recentEl = document.getElementById('recentBookings');
+    if (!recentBookings.length) {
+      recentEl.innerHTML = `<div class="empty" style="padding:20px;"><p class="text-muted text-sm">No booking history yet</p></div>`;
+    } else {
+      recentEl.innerHTML = `
+        <div class="table-wrap"><table>
+          <thead><tr><th>Turf</th><th>Sport</th><th>Date</th><th>Time</th><th>Amount</th><th>Status</th></tr></thead>
+          <tbody>${recentBookings.map(b => `
+            <tr>
+              <td><a href="turf-detail.html?id=${b.turf?._id}" class="text-blue font-semi">${b.turf?.name || '–'}</a></td>
+              <td>${b.turfSport?.sportName || '–'}</td>
+              <td>${Utils.formatDate(b.bookingDate)}</td>
+              <td style="white-space:nowrap;">${Utils.formatTime(b.startTime)} – ${Utils.formatTime(b.endTime)}</td>
+              <td class="font-semi">${Utils.formatCurrency(b.amount)}</td>
+              <td>${Utils.getStatusBadge(b.status)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>`;
+    }
+  } catch (err) { Toast.error(err.message); }
+}
+
+function renderBookingCard(b) {
+  const imgUrl = b.turf?.images?.[0] ? `http://localhost:5000${b.turf.images[0].url}` : null;
+  return `
+    <div class="bk-card">
+      <div class="bk-head">
+        <div class="flex items-center gap-2">
+          ${Utils.getSportIcon(b.turfSport?.sportName || '')}
+          <span class="font-bold">${b.turfSport?.sportName || 'Sport'}</span>
+        </div>
+        ${Utils.getStatusBadge(b.status)}
+      </div>
+      <div class="bk-body">
+        ${imgUrl ? `<img src="${imgUrl}" class="bk-thumb" onerror="this.style.display='none'" />` : '<div class="bk-thumb" style="display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🏟️</div>'}
+        <div style="flex:1;">
+          <div class="bk-name">${b.turf?.name || 'Turf'}</div>
+          <div class="bk-meta">
+            <span>${b.turf?.address?.city || ''}</span>
+            <span>${Utils.formatDate(b.bookingDate)}</span>
+            <span>${Utils.formatTime(b.startTime)} – ${Utils.formatTime(b.endTime)}</span>
+          </div>
+          <div class="bk-amount">${Utils.formatCurrency(b.amount)}</div>
+        </div>
+      </div>
+      ${b.qrCode ? `<div style="padding:12px 18px;border-top:1px solid var(--border);"><details><summary class="text-xs text-blue font-semi" style="cursor:pointer;">Show QR code</summary><img src="${b.qrCode}" style="width:130px;margin-top:8px;" /></details></div>` : ''}
+    </div>`;
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

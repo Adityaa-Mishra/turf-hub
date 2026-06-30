@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Browse Turfs — TurfHub</title>
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<nav class="nav" id="navbar"></nav>
+
+<div class="section-sm">
+  <div class="wrap">
+    <div class="mb-5">
+      <h1 style="font-size:1.625rem;margin-bottom:4px;">Browse turfs</h1>
+      <p class="text-muted text-sm" id="resultCount">Loading…</p>
+    </div>
+
+    <div class="filter-bar">
+      <div class="search-wrap" style="flex:2;">
+        <span class="si">⌕</span>
+        <input type="text" id="searchInput" class="field" placeholder="Search turf name, city…" />
+      </div>
+      <select id="cityFilter" class="field" style="min-width:140px;width:auto;"><option value="">All cities</option></select>
+      <select id="sportFilter" class="field" style="min-width:150px;width:auto;">
+        <option value="">All sports</option>
+        <option>Football</option><option>Cricket</option><option>Badminton</option>
+        <option>Volleyball</option><option>Basketball</option><option>Tennis</option>
+        <option>Hockey</option><option>Kabaddi</option><option>Table Tennis</option>
+      </select>
+      <select id="sortFilter" class="field" style="min-width:140px;width:auto;">
+        <option value="-createdAt">Newest first</option>
+        <option value="-averageRating">Top rated</option>
+        <option value="name">Name A–Z</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear</button>
+    </div>
+
+    <div id="turfsGrid" class="turfs-grid">
+      <div class="loading-box" style="grid-column:1/-1;"><div class="spin spin-lg"></div></div>
+    </div>
+    <div id="pagination" class="pagination"></div>
+  </div>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+let currentPage = 1;
+const limit = 9;
+let debounceTimer;
+
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('city')) document.getElementById('cityFilter').value = urlParams.get('city');
+if (urlParams.get('sport')) document.getElementById('sportFilter').value = urlParams.get('sport');
+if (urlParams.get('search')) document.getElementById('searchInput').value = urlParams.get('search');
+
+async function loadTurfs(page = 1) {
+  currentPage = page;
+  const grid = document.getElementById('turfsGrid');
+  grid.innerHTML = `<div class="loading-box" style="grid-column:1/-1;"><div class="spin spin-lg"></div></div>`;
+
+  const params = { page, limit, sort: document.getElementById('sortFilter').value || '-createdAt' };
+  const search = document.getElementById('searchInput').value.trim();
+  const city = document.getElementById('cityFilter').value;
+  const sport = document.getElementById('sportFilter').value;
+  if (search) params.search = search;
+  if (city) params.city = city;
+  if (sport) params.sport = sport;
+
+  try {
+    const res = await API.get('/turfs', params);
+    const { data: turfs, total, totalPages } = res;
+    document.getElementById('resultCount').textContent = `${total} turf${total !== 1 ? 's' : ''} found`;
+
+    if (!turfs.length) {
+      grid.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="empty-ico">🏟️</div><h3>No turfs found</h3><p>Try adjusting your filters or search term</p><button class="btn btn-secondary btn-sm mt-3" onclick="clearFilters()">Clear filters</button></div>`;
+      document.getElementById('pagination').innerHTML = '';
+      return;
+    }
+    grid.innerHTML = turfs.map(renderCard).join('');
+    renderPagination(page, totalPages);
+    populateCities(turfs);
+  } catch (err) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="empty-ico">⚠️</div><h3>Error loading turfs</h3><p>${err.message}</p></div>`;
+  }
+}
+
+function renderCard(turf) {
+  const imgUrl = Utils.getTurfImageUrl(turf) || Utils.placeholderSVG(400,200);
+  const sports = turf.sports || [];
+  const minPrice = sports.length ? Math.min(...sports.map(s => s.pricePerHour)) : 0;
+  const sportsChips = sports.slice(0,3).map(s => `<span class="sport-pill">${Utils.getSportIcon(s.sportName)} ${s.sportName}</span>`).join('');
+
+  return `
+    <a href="turf-detail.html?id=${turf._id}" class="turf-card">
+      <div class="turf-card-img">
+        <img src="${imgUrl}" alt="${turf.name}" loading="lazy" onerror="this.src='${Utils.placeholderSVG(400,200)}'" />
+        <span class="turf-card-city">${turf.address?.city || ''}</span>
+      </div>
+      <div class="turf-card-body">
+        <div class="turf-card-name">${turf.name}</div>
+        <div class="turf-card-loc">${turf.address?.street ? turf.address.street + ', ' : ''}${turf.address?.city || ''}</div>
+        <div class="turf-card-sports">${sportsChips || '<span class="sport-pill">Multi-sport</span>'}</div>
+        <div class="turf-card-foot">
+          <div class="price-badge">${minPrice ? Utils.formatCurrency(minPrice) : 'On request'}<sup>/hr</sup></div>
+          <div class="rating-badge"><span class="star">★</span> ${turf.averageRating ? turf.averageRating.toFixed(1) : 'New'}</div>
+        </div>
+      </div>
+    </a>`;
+}
+
+function renderPagination(current, total) {
+  const container = document.getElementById('pagination');
+  if (total <= 1) { container.innerHTML = ''; return; }
+  let html = `<button class="pg-btn" onclick="loadTurfs(${current-1})" ${current===1?'disabled':''}>←</button>`;
+  for (let i = 1; i <= total; i++) {
+    if (i === 1 || i === total || Math.abs(i-current) <= 1) {
+      html += `<button class="pg-btn ${i===current?'on':''}" onclick="loadTurfs(${i})">${i}</button>`;
+    } else if (Math.abs(i-current) === 2) {
+      html += `<span style="padding:0 4px;color:var(--ink-4);">…</span>`;
+    }
+  }
+  html += `<button class="pg-btn" onclick="loadTurfs(${current+1})" ${current===total?'disabled':''}>→</button>`;
+  container.innerHTML = html;
+}
+
+function populateCities(turfs) {
+  const sel = document.getElementById('cityFilter');
+  const current = sel.value;
+  [...new Set(turfs.map(t => t.address?.city).filter(Boolean))].forEach(city => {
+    if (!sel.querySelector(`option[value="${city}"]`)) {
+      const opt = document.createElement('option');
+      opt.value = city; opt.textContent = city;
+      sel.appendChild(opt);
+    }
+  });
+  if (current) sel.value = current;
+}
+
+function clearFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('cityFilter').value = '';
+  document.getElementById('sportFilter').value = '';
+  document.getElementById('sortFilter').value = '-createdAt';
+  loadTurfs(1);
+}
+
+document.getElementById('searchInput').addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => loadTurfs(1), 400);
+});
+['cityFilter','sportFilter','sortFilter'].forEach(id => document.getElementById(id).addEventListener('change', () => loadTurfs(1)));
+
+loadTurfs();
+</script>
+</body>
+</html>

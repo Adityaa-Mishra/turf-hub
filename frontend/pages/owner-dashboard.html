@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Owner Dashboard — TurfHub</title>
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<nav class="nav" id="navbar"></nav>
+
+<div class="dash-layout">
+  <aside class="sidebar">
+    <ul class="sb-nav">
+      <li><a href="owner-dashboard.html" class="on"><span class="ic">▦</span> Dashboard</a></li>
+      <li><a href="my-turfs.html"><span class="ic">⬚</span> My Turfs</a></li>
+      <li><a href="add-turf.html"><span class="ic">+</span> Add Turf</a></li>
+      <li><a href="booking-requests.html"><span class="ic">▤</span> Booking Requests</a></li>
+      <div class="sb-section-lbl">Account</div>
+      <li><a href="profile.html"><span class="ic">◐</span> Profile</a></li>
+    </ul>
+  </aside>
+
+  <main class="dash-content">
+    <div class="dash-header">
+      <div>
+        <h1 class="dash-title">Owner dashboard</h1>
+        <p class="dash-sub" id="welcomeMsg">Loading…</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="booking-requests.html" class="btn btn-secondary btn-sm">Requests</a>
+        <a href="add-turf.html" class="btn btn-primary btn-sm">+ Add turf</a>
+      </div>
+    </div>
+
+    <div class="stats-grid mb-6" id="statsGrid">
+      ${['Total bookings','Revenue','Confirmed','Pending','Active sports','Avg. price/hr','Reviews'].map(() => `
+        <div class="stat-card"><div class="stat-icon si-blue">▤</div><div><div class="skel" style="height:24px;width:60px;"></div><div class="stat-lbl mt-2">…</div></div></div>`).join('')}
+    </div>
+
+    <div class="two-col mb-5">
+      <div class="card">
+        <div class="card-header"><h3>Monthly revenue</h3></div>
+        <div id="revenueChart" style="padding:20px;min-height:190px;"><div class="loading-box"><div class="spin"></div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Sport-wise bookings</h3></div>
+        <div id="sportBreakdown" style="padding:20px;"><div class="loading-box"><div class="spin"></div></div></div>
+      </div>
+    </div>
+
+    <div class="card mb-5">
+      <div class="card-header"><h3>Sports catalogue</h3></div>
+      <div id="sportsCatalog" style="padding:20px;"><div class="loading-box"><div class="spin"></div></div></div>
+    </div>
+
+    <div class="card mb-5">
+      <div class="card-header">
+        <h3>Upcoming confirmed bookings</h3>
+        <a href="booking-requests.html?status=accepted" class="text-blue text-sm font-semi">View all</a>
+      </div>
+      <div id="upcomingBookings" style="padding:20px;"><div class="loading-box"><div class="spin"></div></div></div>
+    </div>
+
+    <div class="card mb-5">
+      <div class="card-header"><h3>Recent reviews</h3></div>
+      <div id="recentReviews"><div class="loading-box"><div class="spin"></div></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>Recent activity</h3>
+        <a href="booking-requests.html" class="text-blue text-sm font-semi">View all</a>
+      </div>
+      <div id="recentActivity"><div class="loading-box"><div class="spin"></div></div></div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error();
+if (!Auth.isOwner()) window.location.href = 'customer-dashboard.html';
+
+const user = Auth.getUser();
+document.getElementById('welcomeMsg').textContent = `Welcome, ${user?.name?.split(' ')[0]} — here's your overview`;
+
+async function loadDashboard() {
+  try {
+    const res = await API.get('/dashboard/owner');
+    const {
+      stats = {},
+      monthlyRevenue = [],
+      sportBreakdown = [],
+      sportsByTurf = [],
+      upcomingBookings = [],
+      recentActivity = [],
+      recentReviews = []
+    } = res.data || {};
+
+    const reviewsCount = stats.totalReviews ?? 0;
+
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="stat-card"><div class="stat-icon si-blue">▤</div><div><div class="stat-val">${stats.totalBookings || 0}</div><div class="stat-lbl">Total bookings</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-green">₹</div><div><div class="stat-val">${Utils.formatCurrency(stats.totalRevenue || 0)}</div><div class="stat-lbl">Total revenue</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-blue">✓</div><div><div class="stat-val">${stats.acceptedBookings || 0}</div><div class="stat-lbl">Confirmed</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-amber">◷</div><div><div class="stat-val">${stats.pendingBookings || 0}</div><div class="stat-lbl">Pending requests</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-purple">🏅</div><div><div class="stat-val">${stats.activeSportsCount || 0}</div><div class="stat-lbl">Active sports</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-teal">₹</div><div><div class="stat-val">${stats.activeSportsCount ? Utils.formatCurrency(Math.round(stats.averagePricePerHour || 0)) : '—'}</div><div class="stat-lbl">Avg. price/hr</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-pink">💬</div><div><div class="stat-val">${reviewsCount}</div><div class="stat-lbl">Reviews received</div></div></div>`;
+
+    renderRevenueChart(monthlyRevenue);
+    renderSportBreakdown(sportBreakdown);
+    renderSportsCatalog(sportsByTurf);
+
+    const upcomingEl = document.getElementById('upcomingBookings');
+    if (!upcomingBookings.length) {
+      upcomingEl.innerHTML = `<div class="empty" style="padding:24px;"><p class="text-muted text-sm">No upcoming bookings</p></div>`;
+    } else {
+      upcomingEl.innerHTML = `
+        <div class="table-wrap"><table>
+          <thead><tr><th>Customer</th><th>Turf</th><th>Sport</th><th>Date</th><th>Time</th><th>Amount</th></tr></thead>
+          <tbody>${upcomingBookings.map(b => `
+            <tr>
+              <td><b>${b.user?.name}</b><br><span class="text-xs text-muted">${b.user?.phone || ''}</span></td>
+              <td>${b.turf?.name}</td>
+              <td>${Utils.getSportIcon(b.turfSport?.sportName)} ${b.turfSport?.sportName}</td>
+              <td>${Utils.formatDate(b.bookingDate)}</td>
+              <td style="white-space:nowrap;">${Utils.formatTime(b.startTime)} – ${Utils.formatTime(b.endTime)}</td>
+              <td class="font-semi text-blue">${Utils.formatCurrency(b.amount)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>`;
+    }
+
+    const reviewEl = document.getElementById('recentReviews');
+    if (!recentReviews.length) {
+      reviewEl.innerHTML = `<div class="empty" style="padding:24px;"><p class="text-muted text-sm">No reviews yet</p></div>`;
+    } else {
+      reviewEl.innerHTML = `
+        <div class="table-wrap"><table>
+          <thead><tr><th>Customer</th><th>Turf</th><th>Rating</th><th>Comment</th><th>Date</th></tr></thead>
+          <tbody>${recentReviews.map(r => `
+            <tr>
+              <td>${r.user?.name || '–'}</td>
+              <td>${r.turf?.name || '–'}</td>
+              <td>${'★'.repeat(r.rating) + '☆'.repeat(5 - r.rating)}</td>
+              <td>${r.comment ? r.comment.substring(0, 80) : '–'}</td>
+              <td>${Utils.formatDate(r.createdAt)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>`;
+    }
+
+    const recentEl = document.getElementById('recentActivity');
+    if (!recentActivity.length) {
+      recentEl.innerHTML = `<div class="empty" style="padding:24px;"><p>No recent activity</p></div>`;
+    } else {
+      recentEl.innerHTML = `
+        <div class="table-wrap"><table>
+          <thead><tr><th>Customer</th><th>Sport</th><th>Date</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>${recentActivity.map(b => `
+            <tr>
+              <td>${b.user?.name || '–'}</td>
+              <td>${Utils.getSportIcon(b.turfSport?.sportName)} ${b.turfSport?.sportName || '–'}</td>
+              <td>${Utils.formatDate(b.bookingDate)}</td>
+              <td>${Utils.formatCurrency(b.amount)}</td>
+              <td>${Utils.getStatusBadge(b.status)}</td>
+              <td>${b.status === 'pending' ? `
+                <button class="btn btn-primary btn-xs" onclick="handleBooking('${b._id}','accept')">Accept</button>
+                <button class="btn btn-danger btn-xs" onclick="handleBooking('${b._id}','decline')">Decline</button>` : '–'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>`;
+    }
+  } catch (err) { Toast.error(err.message); }
+}
+
+function renderRevenueChart(data) {
+  const el = document.getElementById('revenueChart');
+  if (!data.length) { el.innerHTML = `<div class="empty"><p class="text-muted text-sm">No revenue data yet</p></div>`; return; }
+
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const maxRevenue = Math.max(...data.map(d => d.revenue), 1);
+  const chartH = 150, barW = Math.min(38, (360 / data.length) - 8);
+
+  const bars = data.map((d,i) => {
+    const h = Math.max((d.revenue/maxRevenue)*chartH, 4);
+    const x = i*(barW+10)+4, y = chartH-h;
+    return `<g><rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="4" fill="var(--blue)" opacity="0.88"/>
+      <text x="${x+barW/2}" y="${chartH+16}" text-anchor="middle" fill="var(--ink-4)" font-size="10">${months[d._id.month-1]}</text>
+      <title>${Utils.formatCurrency(d.revenue)}</title></g>`;
+  }).join('');
+  const totalW = data.length*(barW+10)+8;
+
+  el.innerHTML = `
+    <svg viewBox="0 0 ${Math.max(totalW,280)} ${chartH+28}" class="chart-wrap" style="width:100%;">${bars}</svg>
+    <div class="text-center text-xs text-muted mt-2">Last 6 months revenue</div>`;
+}
+
+function renderSportBreakdown(data) {
+  const el = document.getElementById('sportBreakdown');
+  if (!data.length) { el.innerHTML = `<div class="empty"><p class="text-muted text-sm">No data yet</p></div>`; return; }
+  const total = data.reduce((s,d) => s+d.bookings, 0);
+  el.innerHTML = data.map(d => {
+    const pct = Math.round((d.bookings/total)*100);
+    return `
+      <div class="mb-3">
+        <div class="flex justify-between mb-2 text-sm">
+          <span>${Utils.getSportIcon(d._id)} <b>${d._id}</b></span>
+          <span class="text-muted">${d.bookings} bookings · ${Utils.formatCurrency(d.revenue)}</span>
+        </div>
+        <div style="height:7px;background:var(--bg);border-radius:4px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:var(--blue);border-radius:4px;"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderSportsCatalog(data) {
+  const el = document.getElementById('sportsCatalog');
+  if (!data.length) {
+    el.innerHTML = `<div class="empty"><p class="text-muted text-sm">No sports added yet</p></div>`;
+    return;
+  }
+
+  el.innerHTML = data.map(turf => {
+    const sportItems = turf.sports.map(s => `
+      <div class="cat-item">
+        <div class="cat-item-title">${Utils.getSportIcon(s.sportName)} ${s.sportName}</div>
+        <div class="cat-item-meta">${Utils.formatCurrency(s.pricePerHour)}/hr · ${s.slotDuration} min · ${s.totalCourts} court${s.totalCourts > 1 ? 's' : ''}</div>
+      </div>`).join('');
+
+    return `
+      <div class="mb-4">
+        <div class="text-sm text-muted mb-2"><b>${turf.turfName}</b></div>
+        <div class="card card-soft">
+          <div class="card-body" style="padding:16px;">
+            ${sportItems || '<div class="text-muted text-sm">No sports configured for this turf.</div>'}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function handleBooking(id, action) {
+  try {
+    await API.put(`/bookings/${id}/${action}`);
+    Toast.success(`Booking ${action === 'accept' ? 'accepted' : 'declined'}`);
+    loadDashboard();
+  } catch (err) { Toast.error(err.message); }
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

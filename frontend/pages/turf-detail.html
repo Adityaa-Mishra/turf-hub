@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Turf Detail — TurfHub</title>
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<nav class="nav" id="navbar"></nav>
+
+<div id="pageContent" style="min-height:60vh;">
+  <div class="loading-box" style="min-height:60vh;"><div class="spin spin-lg"></div></div>
+</div>
+
+<!-- Booking Modal -->
+<div class="modal-backdrop" id="bookingModal">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-head">
+      <h3>Book a slot</h3>
+      <button class="modal-x" onclick="Modal.close('bookingModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-stack">
+        <div class="form-row">
+          <label>Sport</label>
+          <select id="bookSport" class="field" onchange="onSportChange()"><option value="">Select sport…</option></select>
+        </div>
+        <div class="form-row">
+          <label>Date</label>
+          <input type="date" id="bookDate" class="field" onchange="loadSlots()" />
+        </div>
+        <div class="form-row">
+          <label>Duration</label>
+          <select id="bookDuration" class="field" onchange="loadSlots()">
+            <option value="60">1 hour</option>
+          </select>
+          <div class="text-xs text-muted mt-1">Choose how many hours you want to book.</div>
+        </div>
+
+        <div id="slotSection" class="hidden">
+          <label class="text-sm font-med text-muted" style="display:block;margin-bottom:8px;">Available slots</label>
+          <div id="slotsGrid" class="slots-grid"></div>
+          <div class="flex gap-3 mt-3 text-xs text-muted">
+            <span class="flex items-center gap-2"><span style="width:10px;height:10px;border-radius:3px;background:var(--blue);display:inline-block;"></span> Available</span>
+            <span class="flex items-center gap-2"><span style="width:10px;height:10px;border-radius:3px;background:var(--bg);border:1px solid var(--border);display:inline-block;"></span> Booked</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label>Notes (optional)</label>
+          <textarea id="bookNotes" class="field" placeholder="Any special requirements…" style="min-height:64px;"></textarea>
+        </div>
+
+        <div id="bookingSummary" class="hidden alert alert-info" style="flex-direction:column;align-items:flex-start;gap:4px;">
+          <div class="font-bold" style="margin-bottom:4px;">Booking summary</div>
+          <div id="summaryContent"></div>
+        </div>
+
+        <div id="bookError" class="alert alert-error hidden"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="Modal.close('bookingModal')">Cancel</button>
+      <button class="btn btn-primary" id="confirmBookBtn" onclick="confirmBooking()" disabled>Send request</button>
+    </div>
+  </div>
+</div>
+
+<!-- Review Modal -->
+<div class="modal-backdrop" id="reviewModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Write a review</h3>
+      <button class="modal-x" onclick="Modal.close('reviewModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-stack">
+        <div class="form-row">
+          <label>Rating</label>
+          <div id="starPicker" style="display:flex;gap:6px;font-size:1.75rem;cursor:pointer;color:var(--amber-lt);">
+            <span onclick="setRating(1)">☆</span><span onclick="setRating(2)">☆</span>
+            <span onclick="setRating(3)">☆</span><span onclick="setRating(4)">☆</span>
+            <span onclick="setRating(5)">☆</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Your review</label>
+          <textarea id="reviewComment" class="field" placeholder="Share your experience… (min 10 characters)" style="min-height:96px;"></textarea>
+        </div>
+        <div id="reviewError" class="alert alert-error hidden"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="Modal.close('reviewModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitReview()">Submit review</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+const turfId = Utils.getQueryParam('id');
+if (!turfId) window.location.href = 'turfs.html';
+
+let turf = null, sports = [], selectedSlot = null, selectedRating = 0;
+const today = new Date().toISOString().split('T')[0];
+
+async function loadTurf() {
+  try {
+    const res = await API.get(`/turfs/${turfId}`);
+    turf = res.data;
+    sports = turf.sports || [];
+    renderPage();
+    loadReviews();
+  } catch (err) {
+    document.getElementById('pageContent').innerHTML = `
+      <div class="empty" style="min-height:60vh;">
+        <div class="empty-ico">⚠️</div><h3>Turf not found</h3><p>${err.message}</p>
+        <a href="turfs.html" class="btn btn-primary mt-3">Browse turfs</a>
+      </div>`;
+  }
+}
+
+function renderPage() {
+  const images = turf.images || [];
+  const primaryImg = images.find(i => i.isPrimary) || images[0];
+  const imgBase = 'http://localhost:5000';
+
+  const amenitiesHtml = (turf.amenities || []).map(a => `<span class="amenity-lbl" style="cursor:default;">✓ ${a}</span>`).join('');
+
+  const sportsHtml = sports.map(s => `
+    <div class="card">
+      <div class="card-body" style="padding:16px;">
+        <div class="flex items-center gap-3 mb-3">
+          <span style="font-size:1.375rem;">${Utils.getSportIcon(s.sportName)}</span>
+          <div>
+            <div class="font-bold" style="font-family:var(--font-display);">${s.sportName}</div>
+            <div class="text-xs text-muted">${s.totalCourts} court${s.totalCourts > 1 ? 's' : ''}</div>
+          </div>
+        </div>
+        <div class="text-xs text-muted" style="display:flex;flex-direction:column;gap:3px;">
+          <div>${Utils.formatTime(s.openingTime)} – ${Utils.formatTime(s.closingTime)}</div>
+          <div>${s.slotDuration} min slots</div>
+        </div>
+        <div class="price-badge mt-2" style="font-size:1rem;">${Utils.formatCurrency(s.pricePerHour)}<sup>/hr</sup></div>
+      </div>
+    </div>`).join('');
+
+  document.title = `${turf.name} — TurfHub`;
+
+  document.getElementById('pageContent').innerHTML = `
+    <div class="wrap" style="padding-top:24px;padding-bottom:56px;">
+      <div class="text-xs text-muted mb-4">
+        <a href="turfs.html" class="text-blue">Browse turfs</a> / ${turf.name}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 340px;gap:28px;align-items:start;">
+        <div>
+          ${images.length ? `
+          <div style="display:grid;grid-template-columns:2fr 1fr;grid-template-rows:auto auto;gap:8px;margin-bottom:24px;border-radius:16px;overflow:hidden;">
+            <div onclick="viewImage('${imgBase}${(primaryImg||images[0]).url}')" style="grid-row:1/3;cursor:zoom-in;height:340px;background:var(--bg);">
+              <img src="${imgBase}${(primaryImg||images[0]).url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='${Utils.placeholderSVG(400,340)}'" />
+            </div>
+            ${images.slice(1,3).map(img => `
+              <div onclick="viewImage('${imgBase}${img.url}')" style="cursor:zoom-in;height:166px;background:var(--bg);">
+                <img src="${imgBase}${img.url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.style.display='none'" />
+              </div>`).join('')}
+          </div>` : `
+          <div style="height:280px;background:var(--bg);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:4rem;margin-bottom:24px;">🏟️</div>`}
+
+          <div class="mb-5">
+            <div class="flex justify-between items-start gap-4 flex-wrap">
+              <div>
+                <h1 style="font-size:1.625rem;margin-bottom:6px;">${turf.name}</h1>
+                <div class="text-muted text-sm flex items-center gap-2 flex-wrap">
+                  <span>${turf.address?.street || ''}, ${turf.address?.city || ''} ${turf.address?.pincode || ''}</span>
+                  <span>•</span>
+                  <span>${turf.contactNumber}</span>
+                </div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;">
+                <div style="font-size:1.375rem;color:var(--ink);font-weight:700;font-family:var(--font-display);">★ ${turf.averageRating ? turf.averageRating.toFixed(1) : 'New'}</div>
+                <div class="text-xs text-muted">${turf.totalReviews || 0} reviews</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card mb-5"><div class="card-body">
+            <h4 class="mb-3">About this turf</h4>
+            <p class="text-sm text-muted" style="line-height:1.7;">${turf.description}</p>
+          </div></div>
+
+          <div class="mb-6">
+            <h4 class="mb-4">Sports available</h4>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;">
+              ${sportsHtml || '<p class="text-muted text-sm">No sports configured yet.</p>'}
+            </div>
+          </div>
+
+          ${amenitiesHtml ? `
+          <div class="mb-6">
+            <h4 class="mb-4">Amenities</h4>
+            <div class="amenity-grid">${amenitiesHtml}</div>
+          </div>` : ''}
+
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <h4>Reviews</h4>
+              ${Auth.isCustomer() ? `<button class="btn btn-secondary btn-sm" onclick="Modal.open('reviewModal')">Write a review</button>` : ''}
+            </div>
+            <div id="reviewsList"><div class="loading-box"><div class="spin"></div></div></div>
+            <div id="reviewPagination" class="flex justify-center mt-4 gap-2"></div>
+          </div>
+        </div>
+
+        <div style="position:sticky;top:calc(var(--nav-h) + 16px);">
+          <div class="card">
+            <div class="card-body">
+              <div class="price-badge" style="font-size:1.375rem;">
+                ${sports.length ? `${Utils.formatCurrency(Math.min(...sports.map(s=>s.pricePerHour)))}` : 'Prices vary'}
+                <span class="text-sm text-muted" style="font-weight:400;">/hr onwards</span>
+              </div>
+              <div class="text-xs text-muted mb-4">${sports.length} sport${sports.length !== 1 ? 's' : ''} available</div>
+
+              <button class="btn btn-primary btn-lg w-full" onclick="openBookingModal()">Book now</button>
+
+              <div class="divider" style="margin:18px 0;"></div>
+
+              <div style="display:flex;flex-direction:column;gap:10px;font-size:0.8375rem;">
+                <div class="flex justify-between"><span class="text-muted">Contact</span><a href="tel:${turf.contactNumber}" class="text-blue font-semi">${turf.contactNumber}</a></div>
+                <div class="flex justify-between"><span class="text-muted">City</span><span class="font-semi">${turf.address?.city || '–'}</span></div>
+                <div class="flex justify-between"><span class="text-muted">Rating</span><span class="font-semi">${turf.averageRating ? turf.averageRating.toFixed(1) + ' / 5' : 'No reviews yet'}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card mt-4"><div class="card-body" style="font-size:0.8125rem;color:var(--ink-3);display:flex;flex-direction:column;gap:8px;padding:16px 20px;">
+            <div class="flex items-center gap-2"><span>✓</span><span>Instant booking request</span></div>
+            <div class="flex items-center gap-2"><span>✓</span><span>Secure & verified</span></div>
+            <div class="flex items-center gap-2"><span>✓</span><span>QR code confirmation</span></div>
+          </div></div>
+        </div>
+      </div>
+    </div>`;
+
+  const bookSportSel = document.getElementById('bookSport');
+  const bookDurationSel = document.getElementById('bookDuration');
+  bookSportSel.innerHTML = '<option value="">Select sport…</option>';
+  if (sports.length === 0) {
+    bookSportSel.innerHTML += '<option value="" disabled>No sports available</option>';
+    bookSportSel.disabled = true;
+    bookDurationSel.innerHTML = '<option value="60">1 hour</option>';
+    bookDurationSel.disabled = true;
+  } else {
+    bookSportSel.disabled = false;
+    bookDurationSel.disabled = false;
+    sports.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s._id;
+      opt.textContent = `${Utils.getSportIcon(s.sportName)} ${s.sportName} — ${Utils.formatCurrency(s.pricePerHour)}/hr`;
+      opt.dataset.sport = JSON.stringify(s);
+      bookSportSel.appendChild(opt);
+    });
+    bookDurationSel.innerHTML = '<option value="60">1 hour</option>';
+  }
+  document.getElementById('bookDate').min = today;
+  document.getElementById('bookDate').value = today;
+}
+
+function openBookingModal() {
+  if (!Auth.isLoggedIn()) { window.location.href = `login.html?redirect=${encodeURIComponent(window.location.href)}`; return; }
+  if (!Auth.isCustomer()) { Toast.warning('Only customers can book turfs.'); return; }
+  selectedSlot = null;
+  document.getElementById('bookError').classList.add('hidden');
+  document.getElementById('bookingSummary').classList.add('hidden');
+  document.getElementById('confirmBookBtn').disabled = true;
+  Modal.open('bookingModal');
+}
+
+function onSportChange() {
+  selectedSlot = null;
+  document.getElementById('slotSection').classList.add('hidden');
+  document.getElementById('bookingSummary').classList.add('hidden');
+  document.getElementById('confirmBookBtn').disabled = true;
+  updateDurationOptions();
+  const date = document.getElementById('bookDate').value;
+  if (date && document.getElementById('bookSport').value) loadSlots();
+}
+
+function updateDurationOptions() {
+  const sportId = document.getElementById('bookSport').value;
+  const durationSel = document.getElementById('bookDuration');
+  durationSel.innerHTML = '';
+  const sportOpt = document.querySelector(`#bookSport option[value="${sportId}"]`);
+  const sportData = sportOpt ? JSON.parse(sportOpt.dataset.sport) : null;
+  if (!sportData) {
+    durationSel.innerHTML = '<option value="60">1 hour</option>';
+    durationSel.disabled = true;
+    return;
+  }
+
+  durationSel.disabled = false;
+  const slotDuration = sportData.slotDuration;
+  const availableMinutes = ((parseInt(sportData.closingTime.split(':')[0], 10) * 60 + parseInt(sportData.closingTime.split(':')[1], 10))
+    - (parseInt(sportData.openingTime.split(':')[0], 10) * 60 + parseInt(sportData.openingTime.split(':')[1], 10)));
+  const maxHours = Math.min(4, Math.floor(availableMinutes / slotDuration));
+  const maxOptions = Math.max(1, maxHours);
+
+  for (let i = 1; i <= maxOptions; i++) {
+    const minutes = i * slotDuration;
+    const opt = document.createElement('option');
+    opt.value = minutes;
+    opt.textContent = `${i} hour${i > 1 ? 's' : ''}`;
+    durationSel.appendChild(opt);
+  }
+}
+
+async function loadSlots() {
+  const sportId = document.getElementById('bookSport').value;
+  const date = document.getElementById('bookDate').value;
+  if (!sportId || !date) return;
+
+  const slotSection = document.getElementById('slotSection');
+  const slotsGrid = document.getElementById('slotsGrid');
+  slotSection.classList.remove('hidden');
+  slotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;"><div class="spin spin-sm"></div></div>`;
+  selectedSlot = null;
+  document.getElementById('confirmBookBtn').disabled = true;
+  document.getElementById('bookingSummary').classList.add('hidden');
+
+  try {
+    const duration = parseInt(document.getElementById('bookDuration').value, 10) || 60;
+    const res = await API.get('/turfs/slots', { turfSportId: sportId, date, duration });
+    const { slots } = res.data;
+    if (!slots.length) { slotsGrid.innerHTML = '<p class="text-muted text-sm">No slots available for this date.</p>'; return; }
+
+    slotsGrid.innerHTML = slots.map(slot => `
+      <button class="slot-btn ${!slot.available ? 'slot-taken' : ''}" ${!slot.available ? 'disabled title="Already booked"' : ''}
+        onclick="selectSlot(this, '${slot.startTime}', '${slot.endTime}')">
+        ${Utils.formatTime(slot.startTime)}<br><small style="opacity:0.7;">${Utils.formatTime(slot.endTime)}</small>
+      </button>`).join('');
+  } catch (err) {
+    slotsGrid.innerHTML = `<p class="text-red text-sm">${err.message}</p>`;
+  }
+}
+
+function selectSlot(btn, startTime, endTime) {
+  document.querySelectorAll('.slot-btn.slot-sel').forEach(b => b.classList.remove('slot-sel'));
+  btn.classList.add('slot-sel');
+  selectedSlot = { startTime, endTime };
+
+  const sportId = document.getElementById('bookSport').value;
+  const sportOpt = document.querySelector(`#bookSport option[value="${sportId}"]`);
+  const sportData = sportOpt ? JSON.parse(sportOpt.dataset.sport) : null;
+  const date = document.getElementById('bookDate').value;
+
+  if (sportData) {
+    const [sh, sm] = startTime.split(':').map(Number);
+    const [eh, em] = endTime.split(':').map(Number);
+    const durationMinutes = ((eh*60+em) - (sh*60+sm));
+    const amount = (durationMinutes / 60) * sportData.pricePerHour;
+
+    document.getElementById('summaryContent').innerHTML = `
+      <div>${sportData.sportName} at ${turf.name}</div>
+      <div>${Utils.formatDate(date)} · ${Utils.formatTime(startTime)} – ${Utils.formatTime(endTime)}</div>
+      <div class="font-bold mt-1">Amount: ${Utils.formatCurrency(amount)}</div>`;
+    document.getElementById('bookingSummary').classList.remove('hidden');
+    document.getElementById('confirmBookBtn').disabled = false;
+  }
+}
+
+async function confirmBooking() {
+  if (!selectedSlot) return;
+  const btn = document.getElementById('confirmBookBtn');
+  const errorEl = document.getElementById('bookError');
+  errorEl.classList.add('hidden');
+
+  const turfSportId = document.getElementById('bookSport').value;
+  const bookingDate = document.getElementById('bookDate').value;
+  const notes = document.getElementById('bookNotes').value.trim();
+  const sportOpt = document.querySelector(`#bookSport option[value="${turfSportId}"]`);
+  const sportData = sportOpt ? JSON.parse(sportOpt.dataset.sport) : {};
+
+  const [sh, sm] = selectedSlot.startTime.split(':').map(Number);
+  const [eh, em] = selectedSlot.endTime.split(':').map(Number);
+  const hours = ((eh*60+em) - (sh*60+sm)) / 60;
+
+  Utils.setButtonLoading(btn, true, 'Sending…');
+  try {
+    await API.post('/bookings', {
+      turfId, turfSportId, bookingDate,
+      startTime: selectedSlot.startTime, endTime: selectedSlot.endTime,
+      notes
+    });
+    Modal.close('bookingModal');
+    Toast.success('Booking request sent. Awaiting owner confirmation.');
+    setTimeout(() => window.location.href = 'bookings.html', 1200);
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('hidden');
+    Utils.setButtonLoading(btn, false);
+    if (err.message.includes('unavailable')) loadSlots();
+  }
+}
+
+function setRating(r) {
+  selectedRating = r;
+  document.querySelectorAll('#starPicker span').forEach((s,i) => s.textContent = i < r ? '★' : '☆');
+}
+
+async function submitReview() {
+  const comment = document.getElementById('reviewComment').value.trim();
+  const errEl = document.getElementById('reviewError');
+  errEl.classList.add('hidden');
+  if (!selectedRating) { errEl.textContent = 'Please select a rating.'; errEl.classList.remove('hidden'); return; }
+  if (comment.length < 10) { errEl.textContent = 'Comment must be at least 10 characters.'; errEl.classList.remove('hidden'); return; }
+
+  try {
+    await API.post('/reviews', { turfId, rating: selectedRating, comment });
+    Modal.close('reviewModal');
+    Toast.success('Review submitted. Thank you!');
+    loadReviews();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function loadReviews(page = 1) {
+  const container = document.getElementById('reviewsList');
+  if (!container) return;
+  container.innerHTML = `<div class="loading-box"><div class="spin"></div></div>`;
+  try {
+    const res = await API.get(`/reviews/${turfId}`, { page, limit: 5 });
+    const { data: reviews, totalPages } = res;
+    if (!reviews.length) {
+      container.innerHTML = `<div class="empty" style="padding:32px;"><div class="empty-ico" style="font-size:1.75rem;">💬</div><p>No reviews yet. Be the first!</p></div>`;
+      return;
+    }
+    container.innerHTML = reviews.map(r => `
+      <div class="card mb-3"><div class="card-body" style="padding:16px 18px;">
+        <div class="flex justify-between items-start mb-2">
+          <div class="flex items-center gap-3">
+            <div class="av" style="width:32px;height:32px;">${Utils.getInitials(r.user?.name)}</div>
+            <div>
+              <div class="font-semi text-sm">${r.user?.name || 'User'}</div>
+              <div class="text-xs text-muted">${Utils.formatDate(r.createdAt)}</div>
+            </div>
+          </div>
+          <div style="color:var(--amber-lt);font-size:0.9375rem;font-weight:700;">★ ${r.rating}/5</div>
+        </div>
+        <p class="text-sm" style="color:var(--ink-2);line-height:1.6;">${r.comment}</p>
+        ${r.ownerReply ? `
+        <div style="margin-top:10px;padding:10px 12px;background:var(--bg);border-radius:8px;border-left:3px solid var(--blue);">
+          <div class="text-xs font-bold text-blue mb-1">Owner reply</div>
+          <p class="text-xs" style="color:var(--ink-2);">${r.ownerReply}</p>
+        </div>` : ''}
+      </div></div>`).join('');
+
+    const pag = document.getElementById('reviewPagination');
+    if (totalPages > 1) {
+      let html = '';
+      for (let i = 1; i <= totalPages; i++) html += `<button class="pg-btn ${i===page?'on':''}" onclick="loadReviews(${i})" style="min-width:30px;height:30px;font-size:0.75rem;">${i}</button>`;
+      pag.innerHTML = html;
+    }
+  } catch (err) {
+    container.innerHTML = `<p class="text-red text-sm">${err.message}</p>`;
+  }
+}
+
+function viewImage(url) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(17,19,24,.9);z-index:999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+  overlay.innerHTML = `<img src="${url}" style="max-width:90vw;max-height:90vh;border-radius:8px;object-fit:contain;" />`;
+  overlay.onclick = () => overlay.remove();
+  document.body.appendChild(overlay);
+}
+
+loadTurf();
+</script>
+</body>
+</html>

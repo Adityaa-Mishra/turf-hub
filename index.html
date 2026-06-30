@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TurfHub — Book Sports Turfs Instantly</title>
+<link rel="stylesheet" href="frontend/css/style.css" />
+</head>
+<body>
+
+<nav class="nav" id="navbar"></nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="wrap hero-inner">
+    <div>
+      <div class="hero-eyebrow">Trusted by 10,000+ players</div>
+      <h1 class="hero-h1">Find and book the<br><em>perfect turf</em><br>near you</h1>
+      <p class="hero-sub">Search football, cricket, badminton and 6 more sports across verified venues. Confirm your slot in under two minutes.</p>
+
+      <div class="search-bar">
+        <div class="sb-field form-row">
+          <label>City</label>
+          <input type="text" id="searchCity" class="field" placeholder="Mumbai, Delhi, Bangalore…" />
+        </div>
+        <div class="sb-divider"></div>
+        <div class="sb-field form-row">
+          <label>Sport</label>
+          <select id="searchSport" class="field">
+            <option value="">All sports</option>
+            <option>Football</option><option>Cricket</option><option>Badminton</option>
+            <option>Basketball</option><option>Volleyball</option><option>Tennis</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="searchTurfs()">Search</button>
+      </div>
+
+      <div class="hero-stats">
+        <div><div class="hs-num" id="statTurfs">500+</div><div class="hs-lbl">Turfs listed</div></div>
+        <div><div class="hs-num">30+</div><div class="hs-lbl">Cities</div></div>
+        <div><div class="hs-num">10K+</div><div class="hs-lbl">Players</div></div>
+        <div><div class="hs-num">6+</div><div class="hs-lbl">Sports</div></div>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="hero-img-big"><img src="https://images.unsplash.com/photo-1551958219-acbc608c6377?w=600&q=80" alt="Football turf" /></div>
+      <div class="hero-img-sm"><img src="https://images.unsplash.com/photo-1626248801379-51a0748a5f96?w=400&q=80" alt="Badminton court" /></div>
+      <div class="hero-img-sm"><img src="https://images.unsplash.com/photo-1593766787879-e8c3736e7e6d?w=400&q=80" alt="Cricket ground" /></div>
+      <div class="hero-float">
+        <div class="hero-float-icon">✓</div>
+        <div>
+          <div class="hero-float-lbl">Last booking</div>
+          <div class="hero-float-val">Confirmed in 4 min</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Feature strip -->
+<section class="section-xs">
+  <div class="wrap">
+    <div class="feature-strip">
+      <div class="feature-item">
+        <div class="feature-icon">⚡</div>
+        <div class="feature-title">Instant requests</div>
+        <div class="feature-desc">Send a booking request and get owner confirmation in minutes, not hours.</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">🔒</div>
+        <div class="feature-title">Verified venues</div>
+        <div class="feature-desc">Every turf is checked for accuracy — real photos, real pricing.</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">📱</div>
+        <div class="feature-title">QR check-in</div>
+        <div class="feature-desc">Show your booking QR at the venue — no paperwork, no waiting.</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">💳</div>
+        <div class="feature-title">Transparent pricing</div>
+        <div class="feature-desc">See the exact hourly rate before you book. No hidden charges.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Sport filter + Featured turfs -->
+<section class="section">
+  <div class="wrap">
+    <div class="section-head flex justify-between items-center flex-wrap gap-3" style="margin-bottom:20px;">
+      <div>
+        <div class="label section-label">Discover</div>
+        <h2 class="section-title">Featured turfs</h2>
+      </div>
+      <a href="frontend/pages/turfs.html" class="btn btn-secondary btn-sm">SEE ALL</a>
+    </div>
+
+    <div class="sport-filters mb-6">
+      <button class="sf-btn on" onclick="filterSport(this,'')">All sports</button>
+      <button class="sf-btn" onclick="filterSport(this,'Football')">⚽ Football</button>
+      <button class="sf-btn" onclick="filterSport(this,'Cricket')">🏏 Cricket</button>
+      <button class="sf-btn" onclick="filterSport(this,'Badminton')">🏸 Badminton</button>
+      <button class="sf-btn" onclick="filterSport(this,'Basketball')">🏀 Basketball</button>
+      <button class="sf-btn" onclick="filterSport(this,'Volleyball')">🏐 Volleyball</button>
+      <button class="sf-btn" onclick="filterSport(this,'Tennis')">🎾 Tennis</button>
+    </div>
+
+    <div id="featuredTurfs" class="turfs-grid">
+      ${Array(3).fill(`
+        <div class="card">
+          <div class="skel" style="height:194px;border-radius:0;"></div>
+          <div style="padding:16px 18px;display:flex;flex-direction:column;gap:10px;">
+            <div class="skel" style="height:16px;width:65%;"></div>
+            <div class="skel" style="height:12px;width:45%;"></div>
+            <div class="skel" style="height:32px;width:100%;border-radius:8px;"></div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="featured-footer"><a href="frontend/pages/turfs.html" class="btn btn-secondary btn-sm">SEE ALL TURFS</a></div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="section" style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+  <div class="wrap">
+    <div class="section-head text-center" style="max-width:520px;margin:0 auto 40px;">
+      <div class="label section-label" style="display:block;">How it works</div>
+      <h2 class="section-title">Book in three steps</h2>
+      <p class="section-sub" style="margin:0 auto;">From search to play, all in one flow.</p>
+    </div>
+    <div class="three-col">
+      <div>
+        <div class="feature-icon" style="margin-bottom:14px;">🔍</div>
+        <h4 style="margin-bottom:6px;">Search your city</h4>
+        <p class="text-muted text-sm" style="line-height:1.6;">Filter by sport, location and price to find the right turf.</p>
+      </div>
+      <div>
+        <div class="feature-icon" style="margin-bottom:14px;">📅</div>
+        <h4 style="margin-bottom:6px;">Pick your slot</h4>
+        <p class="text-muted text-sm" style="line-height:1.6;">Choose date and time. Availability updates in real time.</p>
+      </div>
+      <div>
+        <div class="feature-icon" style="margin-bottom:14px;">✅</div>
+        <h4 style="margin-bottom:6px;">Get confirmed</h4>
+        <p class="text-muted text-sm" style="line-height:1.6;">The owner confirms your request and you receive a QR pass.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA for owners -->
+<section class="section">
+  <div class="wrap">
+    <div class="cta-band">
+      <div class="cta-band-left">
+        <div class="cta-band-label">For turf owners</div>
+        <h3 class="cta-band-h">List your turf, fill every slot</h3>
+        <p class="cta-band-sub">Join 500+ owners managing bookings, tracking revenue and growing their business on TurfHub.</p>
+      </div>
+      <div class="cta-band-right">
+        <a href="frontend/pages/register.html?role=owner" class="btn btn-white btn-lg">List your turf</a>
+        <a href="frontend/pages/turfs.html" class="btn btn-ghost-white btn-lg">Browse turfs</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand"><div class="footer-brand-mark">⚡</div>TurfHub</div>
+        <p class="footer-desc">India's multi-sport turf booking platform. Find, book and play.</p>
+      </div>
+      <div>
+        <div class="footer-heading">Explore</div>
+        <ul class="footer-links">
+          <li><a href="frontend/pages/turfs.html">Browse turfs</a></li>
+          <li><a href="frontend/pages/turfs.html?sport=Football">Football</a></li>
+          <li><a href="frontend/pages/turfs.html?sport=Cricket">Cricket</a></li>
+          <li><a href="frontend/pages/turfs.html?sport=Badminton">Badminton</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-heading">Account</div>
+        <ul class="footer-links">
+          <li><a href="frontend/pages/login.html">Sign in</a></li>
+          <li><a href="frontend/pages/register.html">Create account</a></li>
+          <li><a href="frontend/pages/register.html?role=owner">List a turf</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-heading">Company</div>
+        <ul class="footer-links">
+          <li><a href="#">About</a></li>
+          <li><a href="#">Privacy</a></li>
+          <li><a href="#">Terms</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2024 TurfHub. All rights reserved.</span>
+      <span>Made for sports lovers</span>
+    </div>
+  </div>
+</footer>
+
+<script src="frontend/js/app.js"></script>
+<script>
+function searchTurfs() {
+  const city = document.getElementById('searchCity').value.trim();
+  const sport = document.getElementById('searchSport').value;
+  const params = new URLSearchParams();
+  if (city) params.set('city', city);
+  if (sport) params.set('sport', sport);
+  window.location.href = `frontend/pages/turfs.html?${params}`;
+}
+
+function filterSport(btn, sport) {
+  document.querySelectorAll('.sf-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  loadFeaturedTurfs(sport);
+}
+
+async function loadFeaturedTurfs(sport = '') {
+  const container = document.getElementById('featuredTurfs');
+  try {
+    const params = { limit: 3 };
+    if (sport) params.sport = sport;
+    const res = await API.get('/turfs', params);
+    const turfs = res.data || [];
+
+    if (!turfs.length) {
+      container.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="empty-ico">🏟️</div><h3>No turfs found</h3><p>Try a different sport or check back later</p></div>`;
+      return;
+    }
+    container.innerHTML = turfs.map(renderTurfCard).join('');
+  } catch (err) {
+    container.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="empty-ico">⚠️</div><h3>Could not load turfs</h3><p>${err.message}</p></div>`;
+  }
+}
+
+function renderTurfCard(turf) {
+  const imgUrl = Utils.getTurfImageUrl(turf) || Utils.placeholderSVG(400,200);
+  const sports = turf.sports || [];
+  const minPrice = sports.length ? Math.min(...sports.map(s => s.pricePerHour)) : 0;
+  const sportsChips = sports.slice(0,3).map(s => `<span class="sport-pill">${Utils.getSportIcon(s.sportName)} ${s.sportName}</span>`).join('');
+
+  return `
+    <a href="frontend/pages/turf-detail.html?id=${turf._id}" class="turf-card">
+      <div class="turf-card-img">
+        <img src="${imgUrl}" alt="${turf.name}" loading="lazy" onerror="this.src='${Utils.placeholderSVG(400,200)}'" />
+        <span class="turf-card-city">${turf.address?.city || 'Nearby'}</span>
+      </div>
+      <div class="turf-card-body">
+        <div class="turf-card-name">${turf.name}</div>
+        <div class="turf-card-loc">${turf.address?.street || ''}, ${turf.address?.city || ''}</div>
+        <div class="turf-card-sports">${sportsChips || '<span class="sport-pill">Multi-sport</span>'}</div>
+        <div class="turf-card-foot">
+          <div class="price-badge">${minPrice ? Utils.formatCurrency(minPrice) : 'On request'}<sup>/hr</sup></div>
+          <div class="rating-badge"><span class="star">★</span> ${turf.averageRating ? turf.averageRating.toFixed(1) : 'New'}</div>
+        </div>
+      </div>
+    </a>`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadFeaturedTurfs();
+  document.getElementById('searchCity')?.addEventListener('keypress', e => { if (e.key === 'Enter') searchTurfs(); });
+  const urlSport = Utils.getQueryParam('sport');
+  if (urlSport) document.getElementById('searchSport').value = urlSport;
+});
+</script>
+</body>
+</html>
