@@ -5,7 +5,7 @@
 
 // ─── Config ───────────────────────────────────────────────
 const CONFIG = {
-  API_BASE: 'http://localhost:5000/api',
+  API_BASE: 'https://turf-hub-zbia.onrender.com/',
   TOKEN_KEY: 'turfhub_token',
   USER_KEY: 'turfhub_user'
 };
