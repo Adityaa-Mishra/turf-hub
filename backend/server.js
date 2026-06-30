@@ -2,15 +2,15 @@
  * TurfHub - Main Server Entry Point
  * Multi-Sport Turf Booking Platform
  */
+
 require('dotenv').config();
-console.log('JWT_SECRET:', process.env.JWT_SECRET);
+
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const path = require('path');
-require('dotenv').config();
 
 const connectDB = require('./config/database');
 const { initSocket } = require('./utils/socket');
@@ -33,31 +33,52 @@ initSocket(server);
 // Connect to MongoDB
 connectDB();
 
-// ─── Security & Middleware ───────────────────────────────────────────────────
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
-}));
+// Security
+app.use(
+  helmet({
+    crossOriginResourcePolicy: {
+      policy: 'cross-origin',
+    },
+  })
+);
 
-app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || 'http://localhost:3000',
-    'http://127.0.0.1:5500',
-    'http://localhost:5500',
-    'null' // for file:// protocol during dev
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// CORS
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5500',
+  'http://127.0.0.1:5500',
+  'http://localhost:3000',
+].filter(Boolean);
 
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow Postman and server-to-server requests
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  })
+);
+
+// Logging
+app.use(
+  morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev')
+);
+
+// Body Parser
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve uploaded files statically
+// Static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ─── Routes ─────────────────────────────────────────────────────────────────
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/turfs', turfRoutes);
 app.use('/api/sports', sportRoutes);
@@ -65,30 +86,44 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
-// Health check
-app.get('/api/health', (req, res) => {
+// Home Route
+app.get('/', (req, res) => {
   res.json({
     success: true,
-    message: 'TurfHub API is running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
+    message: 'Welcome to TurfHub API',
   });
 });
 
-// ─── Error Handling ──────────────────────────────────────────────────────────
+// Health Check
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'TurfHub API is running',
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Error Handling
 app.use(notFound);
 app.use(errorHandler);
 
-// ─── Start Server ────────────────────────────────────────────────────────────
+// Start Server
 const PORT = process.env.PORT || 5000;
+
 server.listen(PORT, () => {
-  console.log(`\n🚀 TurfHub Server running on port ${PORT}`);
-  console.log(`📡 API: http://localhost:${PORT}/api`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}\n`);
+  console.log(`🚀 TurfHub Server running on port ${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-// Handle unhandled promise rejections
+// Unhandled Promise Rejections
 process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err.message);
+  console.error('Unhandled Rejection:', err);
   server.close(() => process.exit(1));
+});
+
+// Uncaught Exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
 });
