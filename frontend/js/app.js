@@ -317,7 +317,7 @@ const SocketManager = {
   connect() {
     if (!window.io || !Auth.isLoggedIn()) return;
     const token = Auth.getToken();
-    this.socket = window.io('http://localhost:5000', { auth: { token } });
+    this.socket = window.io('https://turf-hub-zbia.onrender.com', { auth: { token } });
     this.socket.on('new_booking', (data) => Toast.info(data.message));
     this.socket.on('booking_accepted', (data) => Toast.success(data.message));
     this.socket.on('booking_declined', (data) => Toast.warning(data.message));
